@@ -7,11 +7,9 @@ use windows_service::service::{
 };
 use windows_service::service_control_handler::{self, ServiceControlHandlerResult};
 
-// Import logging macros
-use log::{info, error};
-
 // Import your sync logic module
 mod gdrive_sync;
+mod file_logger;
 
 const SERVICE_NAME: &str = "GdriveStealthSync";
 
@@ -25,24 +23,29 @@ extern "system" fn ffi_service_main(_argc: u32, _argv: *mut *mut u16) {
     // The mpsc channel is used to send a stop signal to the service loop.
     let (shutdown_tx, shutdown_rx) = mpsc::channel();
 
-    // Initialize eventlog as the logger
-    match eventlog::register(SERVICE_NAME) {
-        Ok(_) => {
-            eprintln!("Successfully registered event source: {}", SERVICE_NAME);
-        },
+    // Initialize file-based logger
+    let exe_path = match std::env::current_exe() {
+        Ok(path) => path,
         Err(e) => {
-            eprintln!("Failed to register event source '{}': {}", SERVICE_NAME, e);
-            eprintln!("This might be due to insufficient permissions or the source already exists.");
+            eprintln!("Failed to get current executable path: {}", e);
+            return;
         }
-    }
+    };
+    let base_dir = exe_path.parent().expect("Failed to get parent dir");
+    let log_file_path = base_dir.join("gdrive_sync.log");
 
-    match eventlog::init(SERVICE_NAME, log::Level::Info) {
+    // Alternative: Use current working directory instead
+    // let log_file_path = std::env::current_dir().unwrap_or_else(|_| base_dir.to_path_buf()).join("gdrive_sync.log");
+
+    eprintln!("Attempting to create log file at: {:?}", log_file_path);
+    match file_logger::init_file_logger(log_file_path.clone()) {
         Ok(_) => {
-            eprintln!("Successfully initialized eventlog for: {}", SERVICE_NAME);
+            eprintln!("Successfully initialized file logger: {:?}", log_file_path);
+            eprintln!("Log file should be created at: {}", log_file_path.display());
         },
         Err(e) => {
-            eprintln!("Failed to initialize eventlog for '{}': {}", SERVICE_NAME, e);
-            eprintln!("Events may not appear in Windows Event Viewer.");
+            eprintln!("Failed to initialize file logger: {}", e);
+            eprintln!("Attempted location was: {}", log_file_path.display());
         }
     }
     
@@ -50,7 +53,7 @@ extern "system" fn ffi_service_main(_argc: u32, _argv: *mut *mut u16) {
     let event_handler = move |control_event| -> ServiceControlHandlerResult {
         match control_event {
             ServiceControl::Stop => {
-                info!("Received stop control event. Shutting down.");
+                file_logger::log_info("Received stop control event. Shutting down.");
                 shutdown_tx.send(()).unwrap();
                 ServiceControlHandlerResult::NoError
             }
@@ -74,7 +77,7 @@ extern "system" fn ffi_service_main(_argc: u32, _argv: *mut *mut u16) {
     }).unwrap();
 
     // Test that logging is working
-    info!("GdriveStealthSync service is initializing...");
+    file_logger::log_info("GdriveStealthSync service is initializing...");
 
     // --- YOUR CORE LOGIC GOES HERE ---
     let _service_thread = std::thread::spawn(move || {
@@ -84,7 +87,7 @@ extern "system" fn ffi_service_main(_argc: u32, _argv: *mut *mut u16) {
         });
     });
 
-    info!("Service started successfully.");
+    file_logger::log_info("Service started successfully.");
 
     // Wait for the stop signal
     shutdown_rx.recv().unwrap();
@@ -103,9 +106,9 @@ extern "system" fn ffi_service_main(_argc: u32, _argv: *mut *mut u16) {
 
 // Helper functions for logging that can be used by other modules
 pub fn log_info(message: &str) {
-    info!("{}", message);
+    file_logger::log_info(message);
 }
 
 pub fn log_error(message: &str) {
-    error!("{}", message);
+    file_logger::log_error(message);
 }

@@ -7,8 +7,8 @@ edition = "2021"
 # For running as a Windows Service
 windows-service = "0.6"
 
-# For the core async runtime
-tokio = { version = "1", features = ["full"] }
+# For the core async runtime - only essential features
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "fs", "io-util"] }
 
 # For watching the file system for new files
 notify = "6.1"
@@ -23,8 +23,17 @@ google-drive3 = "6.0.0"
 yup-oauth2 = "12.1.0"
 hyper = "1.0"
 hyper-util = { version = "0.1", features = ["client-legacy", "http1"] }
-hyper-rustls = { version = "0.27", features = ["native-tokio", "http1", "tls12", "logging", "ring"], default-features = false }
+hyper-rustls = { version = "0.27", features = ["native-tokio", "http1", "tls12"], default-features = false }
 
-# For logging to the Windows Event Log
-log = "0.4"
-eventlog = "0.3.0"
+# For timestamp formatting in logs
+chrono = { version = "0.4", features = ["serde"] }
+
+[profile.release]
+opt-level = 'z'     # Optimize for size. 's' is a good alternative.
+lto = true          # Enable Link-Time Optimization
+codegen-units = 1   # Reduce parallel code generation units
+panic = 'abort'     # Abort on panic instead of unwinding the stack
+strip = true        # Automatically strip symbols from the binary
+overflow-checks = false  # Disable overflow checks for smaller binary
+debug = false       # Remove debug info completely
+rpath = false       # Don't include rpath
