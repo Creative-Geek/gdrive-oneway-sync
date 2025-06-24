@@ -1,4 +1,4 @@
-// #![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -51,8 +51,6 @@ enum AppError {
     CredentialsCopyError(String),
 }
 fn main() -> Result<(), slint::PlatformError> {
-    // THIS IS THE FIX: Force Slint to use the software renderer.
-    std::env::set_var("SLINT_RENDERER", "femtovg");
 
     let ui = AppWindow::new()?;
     let ui_handle = ui.as_weak();
