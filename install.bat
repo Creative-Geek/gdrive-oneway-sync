@@ -47,6 +47,6 @@ echo.
 echo === Installation Complete ===
 echo.
 echo You can check the Windows Event Log (under 'Windows Logs' -> 'Application')
-echo for messages from '%ServiceName%' to verify it's working.
+echo for messages from '%ServiceName%' to verify it is working.
 echo.
 pause
