@@ -1,0 +1,62 @@
+import { Button, LineEdit, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
+export component AppWindow inherits Window {
+    title: "G-Drive Configurator";
+    // The icon is set by the windows.rc file during the build.
+    width: 500px;
+    height: 300px;
+
+    // --- State Properties (to communicate with Rust) ---
+    in-out property <string> local_path;
+    in-out property <string> gdrive_link;
+    in-out property <string> credentials_path;
+    in-out property <string> status_text;
+    in-out property <brush> status_color: red;
+
+    // --- Callbacks (triggered by UI, handled in Rust) ---
+    callback browse_local_folder();
+    callback browse_credentials();
+    callback save_config();
+
+    // --- UI Layout ---
+    VerticalBox {
+        spacing: 10px;
+        padding: 15px;
+
+        HorizontalBox {
+            Text { text: "Local Folder:"; vertical-alignment: center; }
+            LineEdit { text: local_path; read-only: true; }
+            Button { text: "Browse..."; clicked => { root.browse_local_folder() } }
+        }
+
+        HorizontalBox {
+            Text { text: "Google Drive Link:"; vertical-alignment: center; }
+            LineEdit { text <=> gdrive_link; placeholder-text: "Paste Google Drive folder link here"; }
+        }
+
+        HorizontalBox {
+            Text { text: "Credentials File:"; vertical-alignment: center; }
+            LineEdit { text: credentials_path; read-only: true; }
+            Button { text: "Browse..."; clicked => { root.browse_credentials() } }
+        }
+
+        Text {
+            text: status_text;
+            color: status_color;
+            wrap: word-wrap;
+            horizontal-alignment: center;
+        }
+
+        HorizontalBox {
+            // Rectangles are built-in, no import needed.
+            // They act as flexible spacers to center the button.
+            Rectangle {}
+            Button {
+                text: "Save Configuration";
+                primary: true;
+                clicked => { root.save_config() }
+            }
+            Rectangle {}
+        }
+    }
+}
