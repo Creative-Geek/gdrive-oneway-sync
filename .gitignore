@@ -1,2 +1,11 @@
+# Build artifacts
 /target
 /gdrive_configurator/target
+
+# Sensitive configuration files
+config.json
+credentials.json
+
+# Log files
+logs/
+*.log

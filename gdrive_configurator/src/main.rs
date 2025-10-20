@@ -11,6 +11,7 @@ slint::include_modules!();
 
 // Define a struct to verify the structure of credentials.json
 #[derive(Deserialize)]
+#[allow(dead_code)] // Fields are used for validation only
 struct ServiceAccount {
     r#type: String,
     project_id: String,

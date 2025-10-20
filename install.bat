@@ -46,7 +46,7 @@ sc.exe start %ServiceName%
 echo.
 echo === Installation Complete ===
 echo.
-echo You can check the Windows Event Log (under 'Windows Logs' -> 'Application')
-echo for messages from '%ServiceName%' to verify it is working.
+echo The service logs are saved in: %InstallDir%\logs\
+echo Check the log files (gdrive_sync_*.log) to verify the service is working.
 echo.
 pause

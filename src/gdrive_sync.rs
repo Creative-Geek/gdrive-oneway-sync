@@ -23,7 +23,13 @@ pub async fn run_sync_loop() {
             return;
         }
     };
-    let base_dir = exe_path.parent().expect("Failed to get parent dir");
+    let base_dir = match exe_path.parent() {
+        Some(dir) => dir,
+        None => {
+            log_error("Failed to get parent directory of executable");
+            return;
+        }
+    };
 
     let config_path = base_dir.join("config.json");
     let config: Config = match fs::read_to_string(&config_path) {
@@ -69,15 +75,18 @@ pub async fn run_sync_loop() {
     };
 
     // Create HTTP client using the newer API structure
+    let https_connector = match hyper_rustls::HttpsConnectorBuilder::new()
+        .with_native_roots()
+    {
+        Ok(builder) => builder.https_or_http().enable_http1().build(),
+        Err(e) => {
+            log_error(&format!("Failed to build HTTPS connector: {}", e));
+            return;
+        }
+    };
+    
     let client = hyper_util::client::legacy::Client::builder(hyper_util::rt::TokioExecutor::new())
-        .build(
-            hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
-                .unwrap()
-                .https_or_http()
-                .enable_http1()
-                .build(),
-        );
+        .build(https_connector);
 
     let hub = DriveHub::new(client, auth);
 
@@ -89,11 +98,20 @@ pub async fn run_sync_loop() {
     log_info(&format!("Target Google Drive folder ID: {}", &config.gdrive_folder_id));
 
     let (tx, rx) = std::sync::mpsc::channel();
-    let mut debouncer = new_debouncer(Duration::from_secs(5), None, tx).unwrap();
+    let mut debouncer = match new_debouncer(Duration::from_secs(5), None, tx) {
+        Ok(d) => d,
+        Err(e) => {
+            log_error(&format!("Failed to create file watcher debouncer: {}", e));
+            return;
+        }
+    };
 
-    debouncer.watcher()
+    if let Err(e) = debouncer.watcher()
         .watch(Path::new(&config.local_folder_path), RecursiveMode::NonRecursive)
-        .unwrap();
+    {
+        log_error(&format!("Failed to watch folder '{}': {}", &config.local_folder_path, e));
+        return;
+    }
 
     for res in rx {
         match res {
@@ -117,7 +135,14 @@ async fn upload_file(hub: &DriveHub<HttpsConnector<HttpConnector>>, file_path: &
     if !file_path.is_file() {
         return;
     }
-    let file_name = file_path.file_name().unwrap().to_str().unwrap();
+    
+    let file_name = match file_path.file_name().and_then(|n| n.to_str()) {
+        Some(name) => name,
+        None => {
+            log_error(&format!("Failed to get file name from path: {:?}", file_path));
+            return;
+        }
+    };
 
     let mut remote_file = api::File::default();
     remote_file.name = Some(file_name.to_string());
@@ -133,10 +158,18 @@ async fn upload_file(hub: &DriveHub<HttpsConnector<HttpConnector>>, file_path: &
 
     log_info(&format!("Uploading '{}' to Google Drive", file_name));
 
+    let mime_type = match "application/octet-stream".parse() {
+        Ok(mt) => mt,
+        Err(e) => {
+            log_error(&format!("Failed to parse MIME type: {}", e));
+            return;
+        }
+    };
+
     let result = hub
         .files()
         .create(remote_file)
-        .upload(file_content, "application/octet-stream".parse().unwrap())
+        .upload(file_content, mime_type)
         .await;
 
     match result {
